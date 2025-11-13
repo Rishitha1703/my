@@ -38,7 +38,7 @@
       when: ansible_os_family == "Debian"
 
     - name: Enable ufw if not active
-      ansible.builtin.command: ufw enable
+      ansible.builtin.command: ufw --force enable
       when: ansible_os_family == "Debian"
 
     - name: Deny port 80/tcp using ufw
