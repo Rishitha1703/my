@@ -1,57 +1,13 @@
 ---
-- name: Harden host firewall and remove HTTP (port 80)
-  hosts: server1
-  become: true
-  gather_facts: true
-
-  vars:
-    # change if your inventory has a different zone
-    fw_zone: public
-
+- name: Test connectivity to remote server
+  hosts: all
+  become: yes
+  gather_facts: no
   tasks:
+    - name: Ping the server
+      ansible.builtin.ping:
+      register: ping_result
 
-    - name: Ensure firewalld service is installed, enabled and running
-      ansible.builtin.service:
-        name: firewalld
-        state: started
-        enabled: yes
-
-    - name: Ensure SSH (22/tcp) is allowed (permanent + immediate)
-      ansible.builtin.firewalld:
-        port: 22/tcp
-        zone: "{{ fw_zone }}"
-        permanent: yes
-        state: enabled
-        immediate: yes
-
-    - name: Remove HTTP (80/tcp) from firewall (permanent + immediate)
-      ansible.builtin.firewalld:
-        port: 80/tcp
-        zone: "{{ fw_zone }}"
-        permanent: yes
-        state: disabled
-        immediate: yes
-
-    - name: Reload firewalld to make sure all changes applied
-      ansible.builtin.command:
-        cmd: firewall-cmd --reload
-      changed_when: false
-      check_mode: no
-
-    - name: Stop and disable Apache httpd (if installed) to ensure nothing listens on 80
-      ansible.builtin.service:
-        name: httpd
-        state: stopped
-        enabled: no
-      ignore_errors: yes
-
-    - name: Check current allowed ports (register output)
-      ansible.builtin.command:
-        cmd: firewall-cmd --list-ports
-      register: fw_ports
-      changed_when: false
-
-    - name: Show allowed ports (debug)
+    - name: Show ping response
       ansible.builtin.debug:
-        var: fw_ports.stdout
-
+        var: ping_result
