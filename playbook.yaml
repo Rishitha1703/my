@@ -1,4 +1,3 @@
----
 - name: Fix open port vulnerability on Linux servers
   hosts: all
   become: yes
@@ -16,25 +15,23 @@
         enabled: yes
       when: ansible_os_family == "RedHat"
 
-    - name: List current open ports (firewalld)
-      ansible.builtin.command: firewall-cmd --list-ports
-      register: fw_ports
-      changed_when: false
-      when: ansible_os_family == "RedHat"
-
     - name: Close vulnerable port 80/tcp (firewalld)
-      ansible.builtin.command: firewall-cmd --remove-port=80/tcp --permanent
+      ansible.builtin.command: firewall-cmd --permanent --remove-port=80/tcp
       when: ansible_os_family == "RedHat"
 
-    - name: Reload firewalld to apply changes
+    - name: Reload firewalld
       ansible.builtin.command: firewall-cmd --reload
       when: ansible_os_family == "RedHat"
 
-    # === UFW SECTION (for Ubuntu/Debian) ===
+    # === UFW SECTION (for Debian/Ubuntu) ===
     - name: Ensure ufw is installed
-      ansible.builtin.package:
+      ansible.builtin.apt:
         name: ufw
         state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Allow SSH before enabling ufw (avoid lockout)
+      ansible.builtin.command: ufw allow 22/tcp
       when: ansible_os_family == "Debian"
 
     - name: Enable ufw if not active
@@ -49,16 +46,15 @@
       ansible.builtin.command: ufw reload
       when: ansible_os_family == "Debian"
 
-    # === Verification ===
-    - name: Display updated firewall rules
-      ansible.builtin.shell: |
-        if [ "{{ ansible_os_family }}" == "RedHat" ]; then
-          firewall-cmd --list-ports
-        else
-          ufw status
-        fi
+    # === STATUS OUTPUT ===
+    - name: Show firewall status
+      ansible.builtin.command: >
+        sh -c 'if [ "{{ ansible_os_family }}" = "RedHat" ];
+               then firewall-cmd --list-ports;
+               else ufw status;
+               fi'
       register: fw_status
 
-    - name: Show firewall status
+    - name: Display firewall status
       ansible.builtin.debug:
         msg: "{{ fw_status.stdout }}"
