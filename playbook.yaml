@@ -1,60 +1,13 @@
-- name: Fix open port vulnerability on Linux servers
+---
+- name: Test connectivity to remote server
   hosts: all
   become: yes
+  gather_facts: no
   tasks:
+    - name: Ping the server
+      ansible.builtin.ping:
+      register: ping_result
 
-    - name: Check OS family
+    - name: Show ping response
       ansible.builtin.debug:
-        msg: "Detected OS Family: {{ ansible_os_family }}"
-
-    # === FIREWALLD SECTION (for RHEL/CentOS/Fedora) ===
-    - name: Ensure firewalld is installed and running
-      ansible.builtin.service:
-        name: firewalld
-        state: started
-        enabled: yes
-      when: ansible_os_family == "RedHat"
-
-    - name: Close vulnerable port 80/tcp (firewalld)
-      ansible.builtin.command: firewall-cmd --permanent --remove-port=80/tcp
-      when: ansible_os_family == "RedHat"
-
-    - name: Reload firewalld
-      ansible.builtin.command: firewall-cmd --reload
-      when: ansible_os_family == "RedHat"
-
-    # === UFW SECTION (for Debian/Ubuntu) ===
-    - name: Ensure ufw is installed
-      ansible.builtin.apt:
-        name: ufw
-        state: present
-      when: ansible_os_family == "Debian"
-
-    - name: Allow SSH before enabling ufw (avoid lockout)
-      ansible.builtin.command: ufw allow 22/tcp
-      when: ansible_os_family == "Debian"
-
-    - name: Enable ufw if not active
-      ansible.builtin.command: ufw --force enable
-      when: ansible_os_family == "Debian"
-
-    - name: Deny port 80/tcp using ufw
-      ansible.builtin.command: ufw deny 80/tcp
-      when: ansible_os_family == "Debian"
-
-    - name: Reload ufw rules
-      ansible.builtin.command: ufw reload
-      when: ansible_os_family == "Debian"
-
-    # === STATUS OUTPUT ===
-    - name: Show firewall status
-      ansible.builtin.command: >
-        sh -c 'if [ "{{ ansible_os_family }}" = "RedHat" ];
-               then firewall-cmd --list-ports;
-               else ufw status;
-               fi'
-      register: fw_status
-
-    - name: Display firewall status
-      ansible.builtin.debug:
-        msg: "{{ fw_status.stdout }}"
+        var: ping_result
