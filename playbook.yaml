@@ -4,29 +4,26 @@
   become: yes
   tasks:
 
+    # ---------- RHEL TASKS ----------
     - name: Ensure firewalld is installed (RHEL only)
       package:
         name: firewalld
         state: present
       when: ansible_os_family == "RedHat"
 
-    - name: Start firewalld (RHEL only)
+    - name: Start and enable firewalld (RHEL only)
       service:
         name: firewalld
         state: started
         enabled: yes
       when: ansible_os_family == "RedHat"
 
-    - name: Ensure UFW is installed (Ubuntu only)
-      package:
-        name: ufw
-        state: present
-      when: ansible_os_family == "Debian"
-
-    - name: Start UFW (Ubuntu only)
-      ufw:
+    - name: Allow SSH port 22 on firewalld (RHEL only)
+      firewalld:
+        port: 22/tcp
         state: enabled
-      when: ansible_os_family == "Debian"
+        permanent: yes
+      when: ansible_os_family == "RedHat"
 
     - name: Close vulnerable port 80 on firewalld (RHEL only)
       firewalld:
@@ -34,6 +31,30 @@
         state: disabled
         permanent: yes
       when: ansible_os_family == "RedHat"
+
+    - name: Reload firewalld (RHEL only)
+      firewalld:
+        state: reloaded
+      when: ansible_os_family == "RedHat"
+
+    # ---------- UBUNTU TASKS ----------
+    - name: Ensure UFW is installed (Ubuntu only)
+      package:
+        name: ufw
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Enable UFW (Ubuntu only)
+      ufw:
+        state: enabled
+      when: ansible_os_family == "Debian"
+
+    - name: Allow SSH on UFW (Ubuntu only)
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+      when: ansible_os_family == "Debian"
 
     - name: Close vulnerable port 80 on UFW (Ubuntu only)
       ufw:
