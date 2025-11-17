@@ -1,83 +1,78 @@
-name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
+---
+- name: Fix Vulnerable Firewall Port on RHEL & Ubuntu
+  hosts: all
+  become: yes
+  vars:
+    vulnerable_port: "80"
 
-on:
-  workflow_dispatch:
+  tasks:
+    # -------------------------------------------------------
+    # DETECT OS
+    # -------------------------------------------------------
+    - name: Gather Facts
+    : ansible.builtin.setup
 
-jobs:
-  fix-firewall:
-    runs-on: ansible-host
+    - name: Show OS Family
+      ansible.builtin.debug:
+        var: ansible_facts['os_family']
 
-    vars:
-      vulnerable_port: "80"
+    # -------------------------------------------------------
+    # FIREWALL FIX FOR RHEL / CENTOS
+    # -------------------------------------------------------
+    - name: Ensure SSH is allowed (RHEL)
+      ansible.builtin.command: firewall-cmd --add-service=ssh --permanent
+      when: ansible_facts['os_family'] == "RedHat"
 
-    steps:
-      # -------------------------------------------------------
-      # Detect OS
-      # -------------------------------------------------------
-      - name: Gather Facts
-        ansible.builtin.setup:
+    - name: Start firewalld (RHEL)
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+      when: ansible_facts['os_family'] == "RedHat"
 
-      - name: Show OS Family
-        ansible.builtin.debug:
-          var: ansible_facts['os_family']
+    - name: Remove vulnerable port (RHEL)
+      ansible.builtin.command: firewall-cmd --remove-port={{ vulnerable_port }}/tcp --permanent
+      when: ansible_facts['os_family'] == "RedHat"
 
-      # -------------------------------------------------------
-      # FIREWALL FIX FOR RHEL / CENTOS (firewalld)
-      # -------------------------------------------------------
-      - name: Ensure SSH is allowed (RHEL)
-        ansible.builtin.command: firewall-cmd --add-service=ssh --permanent
-        when: ansible_facts['os_family'] == "RedHat"
+    - name: Reload firewalld (RHEL)
+      ansible.builtin.command: firewall-cmd --reload
+      when: ansible_facts['os_family'] == "RedHat"
 
-      - name: Start firewalld (RHEL)
-        ansible.builtin.service:
-          name: firewalld
-          state: started
-          enabled: yes
-        when: ansible_facts['os_family'] == "RedHat"
+    - name: Verify RHEL open ports
+      ansible.builtin.command: firewall-cmd --list-ports
+      register: rhel_ports
+      when: ansible_facts['os_family'] == "RedHat"
 
-      - name: Remove vulnerable port (RHEL)
-        ansible.builtin.command: firewall-cmd --remove-port={{ vulnerable_port }}/tcp --permanent
-        when: ansible_facts['os_family'] == "RedHat"
+    - name: Print final RHEL firewall ports
+      ansible.builtin.debug:
+        var: rhel_ports.stdout
+      when: ansible_facts['os_family'] == "RedHat"
 
-      - name: Reload firewalld (RHEL)
-        ansible.builtin.command: firewall-cmd --reload
-        when: ansible_facts['os_family'] == "RedHat"
+    # -------------------------------------------------------
+    # FIREWALL FIX FOR UBUNTU / DEBIAN
+    # -------------------------------------------------------
+    - name: Ensure SSH is allowed (Ubuntu)
+      ansible.builtin.command: ufw allow 22/tcp
+      when: ansible_facts['os_family'] == "Debian"
 
-      - name: Verify RHEL open ports
-        ansible.builtin.command: firewall-cmd --list-ports
-        register: rhel_ports
-        when: ansible_facts['os_family'] == "RedHat"
+    - name: Enable UFW (Ubuntu)
+      ansible.builtin.command: yes | ufw enable
+      when: ansible_facts['os_family'] == "Debian"
 
-      - name: Print final RHEL firewall ports
-        ansible.builtin.debug:
-          var: rhel_ports.stdout
-        when: ansible_facts['os_family'] == "RedHat"
+    - name: Remove vulnerable port (Ubuntu)
+      ansible.builtin.command: ufw deny {{ vulnerable_port }}
+      when: ansible_facts['os_family'] == "Debian"
 
-      # -------------------------------------------------------
-      # FIREWALL FIX FOR UBUNTU (UFW)
-      # -------------------------------------------------------
-      - name: Ensure SSH is allowed (Ubuntu)
-        ansible.builtin.command: ufw allow 22/tcp
-        when: ansible_facts['os_family'] == "Debian"
+    - name: Reload UFW (Ubuntu)
+      ansible.builtin.command: ufw reload
+      when: ansible_facts['os_family'] == "Debian"
 
-      - name: Enable UFW (Ubuntu)
-        ansible.builtin.command: yes | ufw enable
-        when: ansible_facts['os_family'] == "Debian"
+    - name: Verify Ubuntu open ports
+      ansible.builtin.command: ufw status numbered
+      register: ubuntu_ports
+      when: ansible_facts['os_family'] == "Debian"
 
-      - name: Remove vulnerable port (Ubuntu)
-        ansible.builtin.command: ufw deny {{ vulnerable_port }}
-        when: ansible_facts['os_family'] == "Debian"
-
-      - name: Reload UFW (Ubuntu)
-        ansible.builtin.command: ufw reload
-        when: ansible_facts['os_family'] == "Debian"
-
-      - name: Verify Ubuntu firewall rules
-        ansible.builtin.command: ufw status numbered
-        register: ubuntu_ports
-        when: ansible_facts['os_family'] == "Debian"
-
-      - name: Print final Ubuntu firewall ports
-        ansible.builtin.debug:
-          var: ubuntu_ports.stdout
-        when: ansible_facts['os_family'] == "Debian"
+    - name: Print final Ubuntu firewall ports
+      ansible.builtin.debug:
+        var: ubuntu_ports.stdout
+      when: ansible_facts['os_family'] == "Debian"
