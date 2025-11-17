@@ -1,4 +1,5 @@
--name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
+---
+- name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
 
 on:
   workflow_dispatch:
