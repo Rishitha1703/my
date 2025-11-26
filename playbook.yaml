@@ -1,11 +1,12 @@
 version: "1.0"
 type: remediation
 name: Fix_Open_Port_80
+description: "Closes port 80 on RHEL and Ubuntu using Ansible"
 
 inputs:
   host_ip:
     type: string
-    title: "Host IP Address"
+    title: "Host IP"
   username:
     type: string
     title: "SSH Username"
@@ -15,8 +16,7 @@ inputs:
     secret: true
 
 steps:
-
-  - name: Run_Ansible_Firewall_Fix
+  - name: Fix_Port_80
     plugin: ansible
     input:
       hosts:
@@ -24,7 +24,6 @@ steps:
       user: "{{ inputs.username }}"
       password: "{{ inputs.password }}"
       playbook: |
-        ---
         - name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
           hosts: all
           become: yes
