@@ -1,89 +1,64 @@
-version: "1.0"
-type: remediation
-name: Fix_Open_Port_80
-description: "Closes port 80 on RHEL and Ubuntu using Ansible"
+---
+- name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
+  hosts: all
+  become: yes
+  tasks:
 
-inputs:
-  host_ip:
-    type: string
-    title: "Host IP"
-  username:
-    type: string
-    title: "SSH Username"
-  password:
-    type: string
-    title: "SSH Password"
-    secret: true
+    # ---------- RHEL TASKS ----------
+    - name: Ensure firewalld is installed (RHEL only)
+      package:
+        name: firewalld
+        state: present
+      when: ansible_os_family == "RedHat"
 
-steps:
-  - name: Fix_Port_80
-    plugin: ansible
-    input:
-      hosts:
-        - "{{ inputs.host_ip }}"
-      user: "{{ inputs.username }}"
-      password: "{{ inputs.password }}"
-      playbook: |
-        - name: Fix Vulnerable Firewall Port (RHEL + Ubuntu)
-          hosts: all
-          become: yes
-          tasks:
+    - name: Start and enable firewalld (RHEL only)
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
 
-            # ---------- RHEL TASKS ----------
-            - name: Ensure firewalld is installed (RHEL only)
-              package:
-                name: firewalld
-                state: present
-              when: ansible_os_family == "RedHat"
+    - name: Allow SSH port 22 on firewalld (RHEL only)
+      firewalld:
+        port: 22/tcp
+        state: enabled
+        permanent: yes
+      when: ansible_os_family == "RedHat"
 
-            - name: Start and enable firewalld (RHEL only)
-              service:
-                name: firewalld
-                state: started
-                enabled: yes
-              when: ansible_os_family == "RedHat"
+    - name: Close vulnerable port 80 on firewalld (RHEL only)
+      firewalld:
+        port: 80/tcp
+        state: disabled
+        permanent: yes
+      when: ansible_os_family == "RedHat"
 
-            - name: Allow SSH port 22 on firewalld (RHEL only)
-              firewalld:
-                port: 22/tcp
-                state: enabled
-                permanent: yes
-              when: ansible_os_family == "RedHat"
+    - name: Reload firewalld (RHEL only)
+      firewalld:
+        state: reloaded
+      when: ansible_os_family == "RedHat"
 
-            - name: Close vulnerable port 80 on firewalld (RHEL only)
-              firewalld:
-                port: 80/tcp
-                state: disabled
-                permanent: yes
-              when: ansible_os_family == "RedHat"
+    # ---------- UBUNTU TASKS ----------
+    - name: Ensure UFW is installed (Ubuntu only)
+      package:
+        name: ufw
+        state: present
+      when: ansible_os_family == "Debian"
 
-            - name: Reload firewalld (RHEL only)
-              firewalld:
-                state: reloaded
-              when: ansible_os_family == "RedHat"
+    - name: Enable UFW (Ubuntu only)
+      ufw:
+        state: enabled
+      when: ansible_os_family == "Debian"
 
-            # ---------- UBUNTU TASKS ----------
-            - name: Ensure UFW is installed (Ubuntu only)
-              package:
-                name: ufw
-                state: present
-              when: ansible_os_family == "Debian"
+    - name: Allow SSH on UFW (Ubuntu only)
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+      when: ansible_os_family == "Debian"
 
-            - name: Enable UFW (Ubuntu only)
-              ufw:
-                state: enabled
-              when: ansible_os_family == "Debian"
-
-            - name: Allow SSH on UFW (Ubuntu only)
-              ufw:
-                rule: allow
-                port: "22"
-                proto: tcp
-              when: ansible_os_family == "Debian"
-
-            - name: Close vulnerable port 80 on UFW (Ubuntu only)
-              ufw:
-                rule: deny
-                port: "80"
-                proto: tcp
-              when: ansible_os_family == "Debian"
+    - name: Close vulnerable port 80 on UFW (Ubuntu only)
+      ufw:
+        rule: deny
+        port: "80"
+        proto: tcp
+      when: ansible_os_family == "Debian"
